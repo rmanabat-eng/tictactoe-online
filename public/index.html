@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tic Tac Toe Online</title>
+<style>
+  :root {
+    --bg: #f5f5f7;
+    --card: #ffffff;
+    --text: #1d1d1f;
+    --muted: #6e6e73;
+    --line: #d2d2d7;
+    --x-color: #0071e3;
+    --o-color: #ff3b30;
+    --win: #34c759;
+    --accent: #0071e3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1e; --card: #2c2c2e; --text: #f5f5f7; --muted: #a1a1a6;
+      --line: #3a3a3c; --x-color: #409cff; --o-color: #ff6961; --win: #30d158; --accent: #409cff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 32px 16px;
+    min-height: 100vh;
+  }
+  .app {
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+  h1 { font-size: 1.5rem; font-weight: 700; margin: 0; letter-spacing: -0.02em; }
+
+  .panel {
+    width: 100%;
+    background: var(--card);
+    border-radius: 16px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    align-items: center;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  }
+  .panel p { margin: 0; color: var(--muted); text-align: center; font-size: 0.95rem; }
+  .panel button {
+    background: var(--accent); color: white; border: none;
+    padding: 12px 20px; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer;
+    width: 100%;
+  }
+  .panel input {
+    border: 1px solid var(--line); background: var(--bg); color: var(--text);
+    padding: 12px; border-radius: 10px; font-size: 1rem; text-align: center;
+    text-transform: uppercase; letter-spacing: 0.1em; width: 100%;
+  }
+  .divider { color: var(--muted); font-size: 0.85rem; }
+
+  .room-code {
+    font-size: 1.8rem; font-weight: 700; letter-spacing: 0.15em;
+    background: var(--bg); padding: 10px 20px; border-radius: 10px;
+  }
+  .share-link {
+    font-size: 0.8rem; color: var(--muted); word-break: break-all; text-align: center;
+  }
+  .copy-btn {
+    background: transparent; border: 1px solid var(--line); color: var(--text);
+    padding: 8px 14px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; width: auto;
+  }
+
+  .status { font-size: 1.05rem; font-weight: 500; color: var(--muted); min-height: 1.4em; text-align: center; }
+  .status .mark-x { color: var(--x-color); font-weight: 700; }
+  .status .mark-o { color: var(--o-color); font-weight: 700; }
+
+  .board {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+    width: 100%; aspect-ratio: 1; background: var(--line); padding: 8px; border-radius: 20px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  }
+  .cell {
+    background: var(--card); border: none; border-radius: 14px;
+    font-size: clamp(2rem, 10vw, 3.2rem); font-weight: 700;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    color: var(--text); transition: background 0.15s ease, transform 0.1s ease; user-select: none;
+  }
+  .cell:hover:not(:disabled) { background: color-mix(in srgb, var(--card) 85%, var(--accent)); }
+  .cell:active:not(:disabled) { transform: scale(0.96); }
+  .cell:disabled { cursor: default; }
+  .cell.x { color: var(--x-color); }
+  .cell.o { color: var(--o-color); }
+  .cell.win { background: color-mix(in srgb, var(--card) 75%, var(--win)); }
+  .cell.pop { animation: pop 0.18s ease; }
+  @keyframes pop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  .reset {
+    background: var(--accent); color: white; border: none; padding: 10px 20px;
+    border-radius: 10px; font-size: 0.95rem; font-weight: 600; cursor: pointer;
+  }
+
+  .hidden { display: none !important; }
+  .you-are { font-size: 0.85rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>Tic Tac Toe Online</h1>
+
+  <div class="panel" id="lobby">
+    <button id="createBtn">Create a Room</button>
+    <div class="divider">— or —</div>
+    <input id="joinCode" placeholder="Enter room code" maxlength="4">
+    <button id="joinBtn">Join Room</button>
+    <p id="lobbyError"></p>
+  </div>
+
+  <div class="panel hidden" id="waiting">
+    <p>Send this code to your friend:</p>
+    <div class="room-code" id="roomCodeDisplay"></div>
+    <button class="copy-btn" id="copyBtn">Copy invite link</button>
+    <p id="waitingText">Waiting for your friend to join…</p>
+  </div>
+
+  <div class="hidden" id="game" style="width:100%; display:flex; flex-direction:column; align-items:center; gap:20px;">
+    <div class="you-are" id="youAre"></div>
+    <div class="status" id="status"></div>
+    <div class="board" id="board"></div>
+    <button class="reset hidden" id="rematchBtn">Rematch</button>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(function() {
+  const socket = io();
+
+  const lobby = document.getElementById('lobby');
+  const waiting = document.getElementById('waiting');
+  const game = document.getElementById('game');
+  const createBtn = document.getElementById('createBtn');
+  const joinBtn = document.getElementById('joinBtn');
+  const joinCode = document.getElementById('joinCode');
+  const lobbyError = document.getElementById('lobbyError');
+  const roomCodeDisplay = document.getElementById('roomCodeDisplay');
+  const copyBtn = document.getElementById('copyBtn');
+  const waitingText = document.getElementById('waitingText');
+  const youAre = document.getElementById('youAre');
+  const statusEl = document.getElementById('status');
+  const boardEl = document.getElementById('board');
+  const rematchBtn = document.getElementById('rematchBtn');
+
+  const WIN_LINES = [
+    [0,1,2],[3,4,5],[6,7,8],
+    [0,3,6],[1,4,7],[2,5,8],
+    [0,4,8],[2,4,6]
+  ];
+
+  let myMark = null;
+  let myRoom = null;
+  let board = Array(9).fill(null);
+  let turn = 'X';
+  let over = false;
+  let opponentPresent = false;
+
+  function showPanel(el) {
+    [lobby, waiting, game].forEach(p => p.classList.add('hidden'));
+    el.classList.remove('hidden');
+  }
+
+  createBtn.addEventListener('click', () => {
+    socket.emit('createRoom');
+  });
+
+  joinBtn.addEventListener('click', () => {
+    const code = joinCode.value.trim();
+    if (!code) return;
+    socket.emit('joinRoom', code);
+  });
+
+  // Auto-fill room code from URL (?room=XXXX)
+  const params = new URLSearchParams(window.location.search);
+  const urlRoom = params.get('room');
+  if (urlRoom) {
+    joinCode.value = urlRoom.toUpperCase();
+  }
+
+  socket.on('roomCreated', ({ code, mark }) => {
+    myRoom = code;
+    myMark = mark;
+    roomCodeDisplay.textContent = code;
+    showPanel(waiting);
+  });
+
+  socket.on('roomJoined', ({ code, mark }) => {
+    myRoom = code;
+    myMark = mark;
+    showPanel(game);
+    youAre.innerHTML = `You are <span class="mark-${mark.toLowerCase()}">${mark}</span>`;
+  });
+
+  socket.on('joinError', (msg) => {
+    lobbyError.textContent = msg;
+  });
+
+  copyBtn.addEventListener('click', () => {
+    const link = `${window.location.origin}${window.location.pathname}?room=${myRoom}`;
+    navigator.clipboard.writeText(link).then(() => {
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => { copyBtn.textContent = 'Copy invite link'; }, 1500);
+    });
+  });
+
+  socket.on('opponentJoined', () => {
+    opponentPresent = true;
+    showPanel(game);
+    youAre.innerHTML = `You are <span class="mark-${myMark.toLowerCase()}">${myMark}</span>`;
+  });
+
+  socket.on('opponentLeft', () => {
+    opponentPresent = false;
+    statusEl.textContent = 'Your opponent left the game.';
+    rematchBtn.classList.add('hidden');
+    renderBoard();
+  });
+
+  socket.on('state', (data) => {
+    board = data.board;
+    turn = data.turn;
+    over = false;
+    rematchBtn.classList.add('hidden');
+    renderBoard();
+    updateStatus();
+    if (typeof data.lastMove === 'number') animatePop(data.lastMove);
+  });
+
+  socket.on('gameOver', (result) => {
+    over = true;
+    if (result.winner === 'draw') {
+      statusEl.textContent = "It's a draw!";
+    } else {
+      statusEl.innerHTML = `<span class="mark-${result.winner.toLowerCase()}">${result.winner}</span> wins!`;
+      result.line.forEach(idx => boardEl.children[idx] && boardEl.children[idx].classList.add('win'));
+    }
+    rematchBtn.classList.remove('hidden');
+    renderBoard();
+  });
+
+  rematchBtn.addEventListener('click', () => {
+    socket.emit('rematch');
+  });
+
+  function renderBoard() {
+    boardEl.innerHTML = '';
+    board.forEach((val, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'cell' + (val ? ' ' + val.toLowerCase() : '');
+      btn.textContent = val || '';
+      btn.disabled = !!val || over || turn !== myMark;
+      btn.addEventListener('click', () => {
+        socket.emit('move', i);
+      });
+      boardEl.appendChild(btn);
+    });
+  }
+
+  function animatePop(i) {
+    const el = boardEl.children[i];
+    if (el) {
+      el.classList.add('pop');
+      setTimeout(() => el.classList.remove('pop'), 200);
+    }
+  }
+
+  function updateStatus() {
+    if (over) return;
+    if (turn === myMark) {
+      statusEl.textContent = 'Your turn';
+    } else {
+      statusEl.innerHTML = `Waiting for <span class="mark-${turn.toLowerCase()}">${turn}</span>…`;
+    }
+  }
+})();
+</script>
+</body>
+</html>
